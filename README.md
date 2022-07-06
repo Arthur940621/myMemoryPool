@@ -25,3 +25,5 @@
 [CentralCache](./note/CentralCache.md)
 
 [PageCache](./note/PageCache.md)
+
+[申请内存与释放内存](./note/%E7%94%B3%E8%AF%B7%E5%86%85%E5%AD%98%E4%B8%8E%E9%87%8A%E6%94%BE%E5%86%85%E5%AD%98.md)
