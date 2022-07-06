@@ -10,7 +10,7 @@
 
 [第四讲: loki::allocator](./内存管理/note/loki%3A%3Aallocator.md)
 
-[第五讲: other 20issues](./内存管理/note/other%20issues.md)
+[第五讲: other issues](./内存管理/note/other%20issues.md)
 
 # 内存池设计
 
