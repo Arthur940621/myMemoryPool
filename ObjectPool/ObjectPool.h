@@ -1,30 +1,17 @@
 #include <iostream>
 #include <cstring>
-
-#ifdef _WIN32
-    #include <Windows.h>
-#else
-    #include <sys/mman.h>
-    #include <fcntl.h>
-    #include <unistd.h>
-#endif
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 // 该函数较短，可设置成内联函数提高效率
 inline static void* system_alloc(size_t kpage) {
-    #ifdef _WIN32
-    // system_alloc 的第二个参数是字节数，因此要把页数转化为字节数，向堆上申请 kpage 块 8192 字节空间
-    void* ptr = VirtualAlloc(0, (kpage << 13), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE); // 直接向系统申请空间
-    if (ptr == nullptr) {
-        throw std::bad_alloc();
-    }
-    #else
-    // linux 下 brk mmap 等
     errno;
     // 该内存可读可写（PROT_READ | PROT_WRITE）
     // 私有映射，所做的修改不会反映到物理设备（MAP_PRIVATE）
     // 匿名映射，映射区不与任何文件关联，内存区域的内容会被初始化为 0（MAP_ANONYMOUS）
     int fd = open("/dev/zero", O_RDWR);
-    void* ptr = mmap(0, (kpage << 13), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, fd, 0);
+    void* ptr = mmap(0, (kpage << 12), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, fd, 0);
     // 成功执行时，mmap() 返回被映射区的指针
     // 失败时，mmap() 返回 MAP_FAILED [其值为(void *)-1]，
     // errno 被设为某个值
@@ -34,8 +21,6 @@ inline static void* system_alloc(size_t kpage) {
         std::cerr << "errno: " << strerror(errno) << std::endl;
         throw std::bad_alloc();
     }
-    #endif
-
     return ptr;
 }
 
