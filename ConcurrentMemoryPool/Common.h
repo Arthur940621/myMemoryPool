@@ -28,7 +28,7 @@ inline static void* system_alloc(size_t kpage) {
     // 私有映射，所做的修改不会反映到物理设备（MAP_PRIVATE）
     // 匿名映射，映射区不与任何文件关联，内存区域的内容会被初始化为 0（MAP_ANONYMOUS）
     int fd = open("/dev/zero", O_RDWR);
-    void* ptr = mmap(0, (kpage * (1 << PAGE_SHIFT)), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, fd, 0);
+    void* ptr = mmap(0, (kpage << PAGE_SHIFT), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, fd, 0);
     // 成功执行时，mmap() 返回被映射区的指针
     // 失败时，mmap() 返回 MAP_FAILED
     // errno 被设为某个值
@@ -79,18 +79,12 @@ public:
         free_list_ = start;
         size_ += n;
     }
-    // 从自由链表头部获取 n 个内存块
-    void pop_range(void*& start, void*& end, size_t n) {
-        assert(n >= size_);
-        start = free_list_;
-        end = start;
-        // 确定获取内存块链表结尾
-        for (size_t i = 1; i != n; ++i) {
-            end = next_obj(end);
-        }
-        free_list_ = next_obj(end);
-        next_obj(end) = nullptr;
-        size_ -= n;
+    // 将自由链表清空
+    void* clear() {
+        size_ = 0;
+        void* list = free_list_;
+        free_list_ = nullptr;
+        return list;
     }
     // 判断自由链表是否为空
     bool empty() {
@@ -119,14 +113,16 @@ class SizeClass {
     // [8*1024+1,64*1024]   1024byte对齐    freelist[128,184)
     // [64*1024+1,256*1024] 8*1024byte对齐  freelist[184,208)
 public:
+    // align_num 是对齐数
     static inline size_t round_up_(size_t bytes, size_t align_num) {
         return (((bytes) + align_num-1) & ~(align_num - 1));
     }
     // 获取向上对齐后的字节数
     static inline size_t round_up(size_t bytes) {
+        assert(bytes <= MAX_BYTES);
         if (bytes <= 128) {
             return round_up_(bytes, 8);
-        } else if (bytes <= 1024) {
+        } else if (bytes <= 8 * 128) {
             return round_up_(bytes, 16);
         } else if (bytes <= 8 * 1024) {
             return round_up_(bytes, 128);
@@ -197,8 +193,7 @@ public:
     // 计算一次向系统获取几个页
     static inline size_t num_move_page(size_t size) {
         size_t num = num_move_size(size);
-        size_t npage = num * size;
-        npage >>= PAGE_SHIFT;
+        size_t npage = num * size >> PAGE_SHIFT;;
         if (npage == 0) {
             npage = 1;
         }
@@ -246,10 +241,13 @@ public:
     void push_front(Span* span) {
         insert(begin(), span);
     }
+    // 尾插
+    void push_back(Span* span) {
+        insert(end(), span);
+    }
     // 删除
     void erase(Span* pos) {
-        assert(head_);
-        assert(pos);
+        assert(pos != nullptr && pos != head_);
         Span* prev = pos->prev_;
         Span* next = pos->next_;
         prev->next_ = next;
@@ -257,23 +255,21 @@ public:
     }
     // 头删
     Span* pop_front() {
-        Span* front = head_->next_;
+        Span* front = begin();
         erase(front);
         return front;
+    }
+    // 尾删
+    Span* pop_back() {
+        Span* back = end();
+        erase(back);
+        return back;
     }
     // 判空
     bool empty() {
         return head_->next_ == head_;
     }
-    // 上锁
-    void lock() {
-        mtx_.lock();
-    }
-    // 解锁
-    void unlock() {
-        mtx_.unlock();
-    }
+    std::mutex mtx_; // 桶锁: 进到桶里的时候才会加锁
 private:
     Span* head_ = nullptr;
-    std::mutex mtx_; // 桶锁: 进到桶里的时候才会加锁
 };

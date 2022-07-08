@@ -1,6 +1,7 @@
 #include "ThreadCache.h"
 #include "CentralCache.h"
 
+// 从自由链表数组的自由链表上拿取内存对象
 void* ThreadCache::Allocate(size_t size) {
     assert(size <= MAX_BYTES);
     size_t align_size = SizeClass::round_up(size);
@@ -48,10 +49,9 @@ void ThreadCache::Deallocate(void* ptr, size_t size) {
 }
 
 void ThreadCache::list_too_long(FreeList& list, size_t size) {
-    void* start = nullptr;
-    void* end = nullptr;
     // 将该段自由链表从哈希桶中切分出来
-    list.pop_range(start, end, list.max_size());
+    void* start = list.clear();
+    // 从 start 开始的内存归还给中心缓存
     CentralCache::get_instance()->release_list_to_spans(start, size);
 }
 

@@ -15,20 +15,12 @@ public:
     void releas_span_to_page(Span* span);
     // 向堆申请一个 Span
     Span* new_span(size_t k);
-    void page_lock() {
-        page_mtx_.lock();
-    }
-    void page_unlock() {
-        page_mtx_.unlock();
-    }
+    std::mutex page_mtx_;
 private:
     PageCache() = default;
     PageCache(const PageCache&) = delete;
     PageCache& operator=(const PageCache&) = delete;
-
     static PageCache inst_;
-    std::mutex page_mtx_; // 一把大锁，一旦访问 PageCache 就要加锁
-
     SpanList span_list_[NPAGES];
     ObjectPool<Span> span_pool_;
     // 建立页号和地址间的映射

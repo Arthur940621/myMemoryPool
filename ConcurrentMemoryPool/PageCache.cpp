@@ -15,14 +15,21 @@ Span* PageCache::map_obj_to_span(void* obj) {
 }
 
 Span* PageCache::new_span(size_t k) {
+    // 加锁，防止多个线程同时到 PageCache 中申请 Span
+    // 这里必须是给全局加锁，不能单独的给每个桶加锁
+    // 如果对应桶没有 Span，是需要向系统申请的
+    // 可能存在多个线程同时向系统申请内存的可能
     assert(k > 0);
     // 如果申请的页大于 128，直接去堆上申请
-    if (k > NPAGES - 1) {
+    if (k >= NPAGES) {
         void* ptr = system_alloc(k);
         Span* span = span_pool_.New();
         span->page_id_ = (PAGE_ID)ptr >> PAGE_SHIFT;
         span->n_ = k;
+        span->object_size_ = k << PAGE_SHIFT;
         // 建立页号和 Span* 的映射
+        // 将申请的大块内存块的第一个页号插入进去就可以
+        // 因为申请的内存大于 MAX_BYTES，是直接还给 PageCache，不需要其他页到这个 Span 的映射
         id_span_map_[span->page_id_] = span;
         return span;
     }
